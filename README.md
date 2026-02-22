@@ -21,8 +21,8 @@ Minimal production-style template for async ingestion processing with:
   - returns `202 Accepted { jobId }`
 - `GET /v1/ingestions/{jobId}`
 - `GET /v1/results/{jobId}`
-- `GET /health/live`
-- `GET /health/ready` (DB connectivity + pending migrations check)
+- `GET /health/live` (liveness only; always `200` while process is running, no external dependency checks)
+- `GET /health/ready` (readiness; returns `200` only when Postgres is reachable and `SELECT 1` succeeds)
 
 ## Configuration
 

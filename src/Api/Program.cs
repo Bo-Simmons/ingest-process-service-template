@@ -19,7 +19,9 @@ builder.Host.UseSerilog((ctx, cfg) =>
 builder.Services.AddProblemDetails();
 builder.Services.AddControllers();
 builder.Services.AddInfrastructure(builder.Configuration);
-builder.Services.AddHealthChecks().AddCheck<ReadyHealthCheck>("ready");
+builder.Services.AddHealthChecks()
+    .AddCheck("live", () => Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy(), tags: ["live"])
+    .AddCheck<DbReadyHealthCheck>("ready", tags: ["ready"]);
 
 var app = builder.Build();
 
@@ -44,8 +46,14 @@ using (var scope = app.Services.CreateScope())
     db.Database.Migrate();
 }
 
-app.MapHealthChecks("/health/live");
-app.MapHealthChecks("/health/ready");
+app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = registration => registration.Tags.Contains("live")
+});
+app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = registration => registration.Tags.Contains("ready")
+});
 app.MapControllers();
 
 app.Run();
