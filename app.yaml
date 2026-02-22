@@ -1,0 +1,38 @@
+name: ingest-process-service
+services:
+  - name: api
+    environment_slug: docker
+    source_dir: /
+    dockerfile_path: Dockerfile.api
+    http_port: 8080
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    envs:
+      - key: ASPNETCORE_URLS
+        value: http://+:8080
+      - key: ConnectionStrings__Db
+        value: "<attach-managed-postgres-and-set-connection-string>"
+      - key: LOG_LEVEL
+        value: Information
+      - key: MAX_ATTEMPTS
+        value: "5"
+      - key: BASE_BACKOFF_SECONDS
+        value: "2"
+workers:
+  - name: worker
+    environment_slug: docker
+    source_dir: /
+    dockerfile_path: Dockerfile.worker
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    envs:
+      - key: ConnectionStrings__Db
+        value: "<attach-managed-postgres-and-set-connection-string>"
+      - key: LOG_LEVEL
+        value: Information
+      - key: WORKER_CONCURRENCY
+        value: "2"
+      - key: MAX_ATTEMPTS
+        value: "5"
+      - key: BASE_BACKOFF_SECONDS
+        value: "2"

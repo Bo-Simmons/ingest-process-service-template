@@ -1,0 +1,44 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ingestion
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ingestion"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__Db: Host=postgres;Port=5432;Database=ingestion;Username=postgres;Password=postgres
+      LOG_LEVEL: Information
+      MAX_ATTEMPTS: 5
+      BASE_BACKOFF_SECONDS: 2
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    environment:
+      ConnectionStrings__Db: Host=postgres;Port=5432;Database=ingestion;Username=postgres;Password=postgres
+      LOG_LEVEL: Information
+      WORKER_CONCURRENCY: 2
+      MAX_ATTEMPTS: 5
+      BASE_BACKOFF_SECONDS: 2
+    depends_on:
+      postgres:
+        condition: service_healthy
