@@ -1,3 +1,4 @@
+using Application;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,6 +17,8 @@ public static class ServiceCollectionExtensions
     {
         var connectionString = DbConnectionFactory.ResolveConnectionString(configuration);
         services.AddDbContext<IngestionDbContext>(opt => opt.UseNpgsql(connectionString));
+        services.AddScoped<IIngestionStore, EfIngestionStore>();
+        services.AddScoped<IIngestionService, IngestionService>();
         return services;
     }
 }

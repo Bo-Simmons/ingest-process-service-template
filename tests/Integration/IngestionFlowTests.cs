@@ -1,5 +1,6 @@
 using System.Linq;
 using System.Net.Http.Json;
+using Api.Contracts;
 using Application;
 using Domain;
 using FluentAssertions;
@@ -59,8 +60,8 @@ public sealed class IngestionFlowTests : IClassFixture<TestApiFactory>
 
         var results = await client.GetFromJsonAsync<JobResultsResponse>($"/v1/results/{postBody.JobId}");
         results.Should().NotBeNull();
-        results!.Results.Should().ContainEquivalentOf(new ResultItem("clicked", 2));
-        results.Results.Should().ContainEquivalentOf(new ResultItem("viewed", 1));
+        results!.Results.Should().ContainEquivalentOf(new Api.Contracts.ResultItem("clicked", 2));
+        results.Results.Should().ContainEquivalentOf(new Api.Contracts.ResultItem("viewed", 1));
     }
 
     /// <summary>
@@ -84,10 +85,6 @@ public sealed class IngestionFlowTests : IClassFixture<TestApiFactory>
         await db.SaveChangesAsync();
     }
 
-    /// <summary>
-    /// Minimal response DTO for create-job endpoint.
-    /// </summary>
-    private sealed record JobCreateResponse(Guid JobId);
 }
 
 /// <summary>
