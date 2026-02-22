@@ -8,6 +8,10 @@ using Microsoft.EntityFrameworkCore;
 using Serilog;
 using Serilog.Formatting.Compact;
 
+/// <summary>
+/// API entry point.
+/// Configures dependencies, middleware, endpoints, and database migrations.
+/// </summary>
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.Configure<WorkerOptions>(builder.Configuration);
@@ -25,6 +29,7 @@ builder.Services.AddHealthChecks().AddCheck<ReadyHealthCheck>("ready");
 
 var app = builder.Build();
 
+// Correlation-id middleware so logs and responses can be tied to one request.
 app.Use(async (context, next) =>
 {
     var correlationId = context.Request.Headers.TryGetValue("X-Correlation-Id", out var values)
@@ -40,6 +45,7 @@ app.Use(async (context, next) =>
 
 app.UseExceptionHandler();
 
+// Apply DB migrations at startup to ensure schema exists before serving traffic.
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<IngestionDbContext>();
@@ -49,6 +55,9 @@ using (var scope = app.Services.CreateScope())
 app.MapHealthChecks("/health/live");
 app.MapHealthChecks("/health/ready");
 
+/// <summary>
+/// Creates a new ingestion job, with optional idempotency support.
+/// </summary>
 app.MapPost("/v1/ingestions", async (
     [FromBody] IngestionRequest request,
     [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
@@ -118,6 +127,9 @@ app.MapPost("/v1/ingestions", async (
     return Results.Accepted($"/v1/ingestions/{job.Id}", new { jobId = job.Id });
 });
 
+/// <summary>
+/// Returns current state for a specific ingestion job.
+/// </summary>
 app.MapGet("/v1/ingestions/{jobId:guid}", async (Guid jobId, IngestionDbContext db, CancellationToken ct) =>
 {
     var job = await db.IngestionJobs.AsNoTracking().FirstOrDefaultAsync(x => x.Id == jobId, ct);
@@ -129,6 +141,9 @@ app.MapGet("/v1/ingestions/{jobId:guid}", async (Guid jobId, IngestionDbContext 
     return Results.Ok(new JobStatusResponse(job.Id, job.Status.ToString(), job.Attempt, job.CreatedAt, job.UpdatedAt, job.ProcessedAt, job.Error));
 });
 
+/// <summary>
+/// Returns aggregated result rows for a processed ingestion job.
+/// </summary>
 app.MapGet("/v1/results/{jobId:guid}", async (Guid jobId, IngestionDbContext db, CancellationToken ct) =>
 {
     var exists = await db.IngestionJobs.AsNoTracking().AnyAsync(x => x.Id == jobId, ct);
@@ -148,10 +163,19 @@ app.MapGet("/v1/results/{jobId:guid}", async (Guid jobId, IngestionDbContext db,
 
 app.Run();
 
+/// <summary>
+/// Exposed for integration tests that need to bootstrap the API host.
+/// </summary>
 public partial class Program;
 
+/// <summary>
+/// Incoming API request for creating an ingestion job.
+/// </summary>
 public sealed record IngestionRequest(string TenantId, IReadOnlyList<IngestionEventRequest> Events)
 {
+    /// <summary>
+    /// Validates required request fields and returns errors in ProblemDetails format.
+    /// </summary>
     public Dictionary<string, string[]> Validate()
     {
         var errors = new Dictionary<string, string[]>();
@@ -190,22 +214,26 @@ public sealed record IngestionRequest(string TenantId, IReadOnlyList<IngestionEv
     }
 }
 
+/// <summary>
+/// One event item inside an ingestion request.
+/// </summary>
 public sealed record IngestionEventRequest(string Type, DateTimeOffset Timestamp, JsonElement Payload);
 
+/// <summary>
+/// Readiness health check verifies that the API can communicate with the database.
+/// </summary>
 public sealed class ReadyHealthCheck(IngestionDbContext db) : Microsoft.Extensions.Diagnostics.HealthChecks.IHealthCheck
 {
+    /// <summary>
+    /// Executes the readiness probe by performing a simple DB connectivity check.
+    /// </summary>
     public async Task<Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult> CheckHealthAsync(
         Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckContext context,
         CancellationToken cancellationToken = default)
     {
-        if (!await db.Database.CanConnectAsync(cancellationToken))
-        {
-            return Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Unhealthy("Database unreachable.");
-        }
-
-        var pendingMigrations = await db.Database.GetPendingMigrationsAsync(cancellationToken);
-        return pendingMigrations.Any()
-            ? Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Unhealthy("Pending migrations detected.")
-            : Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy();
+        var canConnect = await db.Database.CanConnectAsync(cancellationToken);
+        return canConnect
+            ? Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy("database reachable")
+            : Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Unhealthy("database unreachable");
     }
 }

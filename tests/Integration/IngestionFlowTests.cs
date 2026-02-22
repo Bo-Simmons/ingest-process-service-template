@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Net.Http.Json;
 using Application;
 using Domain;
@@ -5,23 +6,30 @@ using FluentAssertions;
 using Infrastructure;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using System.Linq;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Integration;
 
-// SQLite fallback integration test to avoid Docker dependency in constrained CI.
+/// <summary>
+/// End-to-end integration tests for API ingestion flow using an in-memory SQLite DB.
+/// </summary>
 public sealed class IngestionFlowTests : IClassFixture<TestApiFactory>
 {
     private readonly TestApiFactory _factory;
 
+    /// <summary>
+    /// Stores test server factory reference for creating HTTP clients and service scopes.
+    /// </summary>
     public IngestionFlowTests(TestApiFactory factory)
     {
         _factory = factory;
     }
 
+    /// <summary>
+    /// Verifies post-ingestion, process, status, and results retrieval flow.
+    /// </summary>
     [Fact]
     public async Task PostIngestion_ProcessJob_GetResults()
     {
@@ -55,6 +63,9 @@ public sealed class IngestionFlowTests : IClassFixture<TestApiFactory>
         results.Results.Should().ContainEquivalentOf(new ResultItem("viewed", 1));
     }
 
+    /// <summary>
+    /// Simulates worker behavior directly in test scope so test can validate API contracts.
+    /// </summary>
     private async Task SimulateWorker(Guid jobId)
     {
         using var scope = _factory.Services.CreateScope();
@@ -73,13 +84,22 @@ public sealed class IngestionFlowTests : IClassFixture<TestApiFactory>
         await db.SaveChangesAsync();
     }
 
+    /// <summary>
+    /// Minimal response DTO for create-job endpoint.
+    /// </summary>
     private sealed record JobCreateResponse(Guid JobId);
 }
 
+/// <summary>
+/// Custom WebApplicationFactory that swaps PostgreSQL with in-memory SQLite for tests.
+/// </summary>
 public sealed class TestApiFactory : WebApplicationFactory<Program>, IDisposable
 {
     private readonly SqliteConnection _connection = new("Data Source=:memory:");
 
+    /// <summary>
+    /// Reconfigures DI services for test hosting and ensures schema creation.
+    /// </summary>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         _connection.Open();
@@ -95,6 +115,9 @@ public sealed class TestApiFactory : WebApplicationFactory<Program>, IDisposable
         });
     }
 
+    /// <summary>
+    /// Cleans up SQLite connection when test host is disposed.
+    /// </summary>
     protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
