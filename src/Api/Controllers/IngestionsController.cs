@@ -9,7 +9,7 @@ namespace Api.Controllers;
 public sealed class IngestionsController(IIngestionService ingestionService) : ControllerBase
 {
     [HttpPost("")]
-    public async Task<IResult> CreateIngestion(
+    public async Task<ActionResult<JobCreateResponse>> CreateIngestion(
         [FromBody] IngestionRequest request,
         [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
         CancellationToken ct)
@@ -17,7 +17,7 @@ public sealed class IngestionsController(IIngestionService ingestionService) : C
         var errors = request.Validate();
         if (errors.Count > 0)
         {
-            return Results.ValidationProblem(errors);
+            return ValidationProblem(errors);
         }
 
         var response = await ingestionService.SubmitAsync(
@@ -27,7 +27,7 @@ public sealed class IngestionsController(IIngestionService ingestionService) : C
             idempotencyKey,
             ct);
 
-        return Results.Accepted($"/v1/ingestions/{response.JobId}", new JobCreateResponse(response.JobId));
+        return Accepted($"/v1/ingestions/{response.JobId}", new JobCreateResponse(response.JobId));
     }
 
     [HttpGet("{jobId:guid}")]

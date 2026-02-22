@@ -1,6 +1,8 @@
 using Api.Health;
 using Application;
 using Infrastructure;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using Serilog.Formatting.Compact;
@@ -20,8 +22,8 @@ builder.Services.AddProblemDetails();
 builder.Services.AddControllers();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddHealthChecks()
-    .AddCheck("live", () => Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy(), tags: ["live"])
-    .AddCheck<DbReadyHealthCheck>("ready", tags: ["ready"]);
+    .AddCheck("live", () => HealthCheckResult.Healthy())
+    .AddCheck<DbReadyHealthCheck>("ready");
 
 var app = builder.Build();
 
@@ -46,13 +48,13 @@ using (var scope = app.Services.CreateScope())
     db.Database.Migrate();
 }
 
-app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+app.MapHealthChecks("/health/live", new HealthCheckOptions
 {
-    Predicate = registration => registration.Tags.Contains("live")
+    Predicate = registration => registration.Name == "live"
 });
-app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
 {
-    Predicate = registration => registration.Tags.Contains("ready")
+    Predicate = registration => registration.Name == "ready"
 });
 app.MapControllers();
 
