@@ -2,8 +2,16 @@ using Microsoft.Extensions.Configuration;
 
 namespace Infrastructure;
 
+/// <summary>
+/// Builds the database connection string from configuration.
+/// Supports both ConnectionStrings:Db and Heroku-style DATABASE_URL.
+/// </summary>
 public static class DbConnectionFactory
 {
+    /// <summary>
+    /// Resolves the connection string to use for EF Core.
+    /// Priority: explicit ConnectionStrings:Db, then DATABASE_URL.
+    /// </summary>
     public static string ResolveConnectionString(IConfiguration configuration)
     {
         var direct = configuration.GetConnectionString("Db");

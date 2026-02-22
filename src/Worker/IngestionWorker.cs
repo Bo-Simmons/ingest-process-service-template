@@ -4,6 +4,10 @@ using Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
+/// <summary>
+/// Background worker that continuously claims ingestion jobs, processes them,
+/// stores aggregated results, and handles retry/failure behavior.
+/// </summary>
 public sealed class IngestionWorker(
     IngestionDbContext db,
     IOptions<WorkerOptions> options,
@@ -12,6 +16,9 @@ public sealed class IngestionWorker(
     private readonly WorkerOptions _options = options.Value;
     private readonly string _workerId = $"{Environment.MachineName}-{Guid.NewGuid():N}";
 
+    /// <summary>
+    /// Starts the configured number of concurrent processing loops.
+    /// </summary>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var loops = Enumerable.Range(0, Math.Max(1, _options.WorkerConcurrency))
@@ -20,6 +27,9 @@ public sealed class IngestionWorker(
         await Task.WhenAll(loops);
     }
 
+    /// <summary>
+    /// Main poll loop: claim a job, process it, and persist success/failure updates.
+    /// </summary>
     private async Task RunLoop(CancellationToken ct)
     {
         while (!ct.IsCancellationRequested)
@@ -56,6 +66,10 @@ public sealed class IngestionWorker(
         }
     }
 
+    /// <summary>
+    /// Attempts to claim one eligible job using a DB transaction and row lock.
+    /// Returns null when no work is currently available.
+    /// </summary>
     private async Task<IngestionJob?> TryClaimJob(CancellationToken ct)
     {
         await using var tx = await db.Database.BeginTransactionAsync(ct);
@@ -87,6 +101,10 @@ LIMIT 1";
         return job;
     }
 
+    /// <summary>
+    /// Updates job metadata after a processing exception.
+    /// Marks terminal failure when max attempts are reached, otherwise schedules retry.
+    /// </summary>
     private async Task HandleFailureAsync(Guid jobId, Exception ex, CancellationToken ct)
     {
         var job = await db.IngestionJobs.FirstAsync(x => x.Id == jobId, ct);

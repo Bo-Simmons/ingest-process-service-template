@@ -4,8 +4,14 @@ using FluentAssertions;
 
 namespace Unit;
 
+/// <summary>
+/// Unit tests for core deterministic processing helper functions.
+/// </summary>
 public sealed class ProcessingLogicTests
 {
+    /// <summary>
+    /// Verifies event aggregation is case-insensitive and produces stable counts.
+    /// </summary>
     [Fact]
     public void AggregateByEventType_ReturnsDeterministicCounts()
     {
@@ -25,6 +31,9 @@ public sealed class ProcessingLogicTests
         });
     }
 
+    /// <summary>
+    /// Verifies exponential backoff doubles each attempt for the configured base value.
+    /// </summary>
     [Theory]
     [InlineData(1, 2)]
     [InlineData(2, 4)]

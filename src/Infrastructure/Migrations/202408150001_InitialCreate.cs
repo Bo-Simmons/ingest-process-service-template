@@ -4,8 +4,14 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace Infrastructure.Migrations;
 
+/// <summary>
+/// Initial schema migration that creates ingestion jobs, raw events, and result tables.
+/// </summary>
 public partial class InitialCreate : Migration
 {
+    /// <summary>
+    /// Applies schema objects required for the ingestion service.
+    /// </summary>
     protected override void Up(MigrationBuilder migrationBuilder)
     {
         migrationBuilder.CreateTable(
@@ -67,6 +73,9 @@ public partial class InitialCreate : Migration
         migrationBuilder.CreateIndex("ix_ingestion_results_job_id", "ingestion_results", "job_id");
     }
 
+    /// <summary>
+    /// Rolls back the schema objects created by this migration.
+    /// </summary>
     protected override void Down(MigrationBuilder migrationBuilder)
     {
         migrationBuilder.DropTable("ingestion_results");

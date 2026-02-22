@@ -3,12 +3,29 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure;
 
+/// <summary>
+/// EF Core database context for ingestion jobs, raw events, and aggregated results.
+/// </summary>
 public sealed class IngestionDbContext(DbContextOptions<IngestionDbContext> options) : DbContext(options)
 {
+    /// <summary>
+    /// Table access for ingestion job records.
+    /// </summary>
     public DbSet<IngestionJob> IngestionJobs => Set<IngestionJob>();
+
+    /// <summary>
+    /// Table access for raw event records.
+    /// </summary>
     public DbSet<RawEvent> RawEvents => Set<RawEvent>();
+
+    /// <summary>
+    /// Table access for aggregated ingestion result records.
+    /// </summary>
     public DbSet<IngestionResult> IngestionResults => Set<IngestionResult>();
 
+    /// <summary>
+    /// Configures table names, keys, indexes, and relationships.
+    /// </summary>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<IngestionJob>(e =>
