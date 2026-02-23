@@ -44,8 +44,12 @@ app.UseExceptionHandler();
 
 using (var scope = app.Services.CreateScope())
 {
-    var db = scope.ServiceProvider.GetRequiredService<IngestionDbContext>();
-    db.Database.Migrate();
+    var shouldRunMigrations = builder.Configuration.GetValue<bool>("RUN_MIGRATIONS_ON_STARTUP");
+    if (shouldRunMigrations)
+    {
+        var db = scope.ServiceProvider.GetRequiredService<IngestionDbContext>();
+        db.Database.Migrate();
+    }
 }
 
 app.MapHealthChecks("/health/live", new HealthCheckOptions
