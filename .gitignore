@@ -1,6 +1,22 @@
+# Build outputs
 bin/
 obj/
+**/bin/
+**/obj/
+
+# Visual Studio
 .vs/
 TestResults/
 *.user
 *.suo
+*.userosscache
+*.sln.docstates
+
+# VS Code
+.vscode/
+
+# Logs
+*.log
+
+# One-off local artifact
+/query
