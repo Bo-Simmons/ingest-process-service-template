@@ -9,7 +9,7 @@ using Microsoft.Extensions.Options;
 /// stores aggregated results, and handles retry/failure behavior.
 /// </summary>
 public sealed class IngestionWorker(
-    IngestionDbContext db,
+    IDbContextFactory<IngestionDbContext> dbContextFactory,
     IOptions<WorkerOptions> options,
     ILogger<IngestionWorker> logger) : BackgroundService
 {
@@ -24,7 +24,18 @@ public sealed class IngestionWorker(
         var loops = Enumerable.Range(0, Math.Max(1, _options.WorkerConcurrency))
             .Select(_ => RunLoop(stoppingToken));
 
-        await Task.WhenAll(loops);
+        try
+        {
+            await Task.WhenAll(loops);
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            // Expected during shutdown.
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Worker loop crashed unexpectedly");
+        }
     }
 
     /// <summary>
@@ -34,34 +45,48 @@ public sealed class IngestionWorker(
     {
         while (!ct.IsCancellationRequested)
         {
-            var claimed = await TryClaimJob(ct);
-            if (claimed is null)
-            {
-                await Task.Delay(TimeSpan.FromSeconds(1), ct);
-                continue;
-            }
-
             try
             {
-                var results = ProcessingLogic.AggregateByEventType(claimed.RawEvents);
-                db.IngestionResults.RemoveRange(db.IngestionResults.Where(x => x.JobId == claimed.Id));
-                foreach (var item in results)
+                await using var db = await dbContextFactory.CreateDbContextAsync(ct);
+
+                var claimed = await TryClaimJob(db, ct);
+                if (claimed is null)
                 {
-                    db.IngestionResults.Add(new IngestionResult { JobId = claimed.Id, EventType = item.EventType, Count = item.Count });
+                    await Task.Delay(TimeSpan.FromSeconds(1), ct);
+                    continue;
                 }
 
-                claimed.Status = IngestionJobStatus.Succeeded;
-                claimed.ProcessedAt = DateTimeOffset.UtcNow;
-                claimed.UpdatedAt = DateTimeOffset.UtcNow;
-                claimed.LockedAt = null;
-                claimed.LockedBy = null;
-                claimed.Error = null;
-                await db.SaveChangesAsync(ct);
+                try
+                {
+                    var results = ProcessingLogic.AggregateByEventType(claimed.RawEvents);
+                    db.IngestionResults.RemoveRange(db.IngestionResults.Where(x => x.JobId == claimed.Id));
+                    foreach (var item in results)
+                    {
+                        db.IngestionResults.Add(new IngestionResult { JobId = claimed.Id, EventType = item.EventType, Count = item.Count });
+                    }
+
+                    claimed.Status = IngestionJobStatus.Succeeded;
+                    claimed.ProcessedAt = DateTimeOffset.UtcNow;
+                    claimed.UpdatedAt = DateTimeOffset.UtcNow;
+                    claimed.LockedAt = null;
+                    claimed.LockedBy = null;
+                    claimed.Error = null;
+                    await db.SaveChangesAsync(ct);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Failed processing job {JobId}", claimed.Id);
+                    await HandleFailureAsync(db, claimed.Id, ex, _options, ct);
+                }
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                break;
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Failed processing job {JobId}", claimed.Id);
-                await HandleFailureAsync(claimed.Id, ex, ct);
+                logger.LogError(ex, "Worker loop iteration failed");
+                await Task.Delay(TimeSpan.FromSeconds(_options.BaseBackoffSeconds), ct);
             }
         }
     }
@@ -70,27 +95,31 @@ public sealed class IngestionWorker(
     /// Attempts to claim one eligible job using a DB transaction and row lock.
     /// Returns null when no work is currently available.
     /// </summary>
-    private async Task<IngestionJob?> TryClaimJob(CancellationToken ct)
+    private async Task<IngestionJob?> TryClaimJob(IngestionDbContext db, CancellationToken ct)
     {
         await using var tx = await db.Database.BeginTransactionAsync(ct);
 
-        var sql = $@"
-SELECT id FROM ingestion_jobs
+        var sql = """
+SELECT id AS "Value"
+FROM ingestion_jobs
 WHERE status IN ('Pending','Processing')
   AND (available_at IS NULL OR available_at <= NOW())
   AND (locked_at IS NULL OR locked_at < NOW() - INTERVAL '5 minutes')
 ORDER BY created_at
 FOR UPDATE SKIP LOCKED
-LIMIT 1";
+LIMIT 1
+""";
 
         var id = await db.Database.SqlQueryRaw<Guid?>(sql).FirstOrDefaultAsync(ct);
         if (id is null || id == Guid.Empty)
         {
-            await tx.RollbackAsync(ct);
             return null;
         }
 
-        var job = await db.IngestionJobs.Include(x => x.RawEvents).FirstAsync(x => x.Id == id, ct);
+        var job = await db.IngestionJobs
+            .Include(x => x.RawEvents)
+            .FirstAsync(x => x.Id == id, ct);
+
         job.Status = IngestionJobStatus.Processing;
         job.Attempt += 1;
         job.LockedAt = DateTimeOffset.UtcNow;
@@ -105,14 +134,14 @@ LIMIT 1";
     /// Updates job metadata after a processing exception.
     /// Marks terminal failure when max attempts are reached, otherwise schedules retry.
     /// </summary>
-    private async Task HandleFailureAsync(Guid jobId, Exception ex, CancellationToken ct)
+    private static async Task HandleFailureAsync(IngestionDbContext db, Guid jobId, Exception ex, WorkerOptions options, CancellationToken ct)
     {
         var job = await db.IngestionJobs.FirstAsync(x => x.Id == jobId, ct);
         job.LockedAt = null;
         job.LockedBy = null;
         job.UpdatedAt = DateTimeOffset.UtcNow;
 
-        if (job.Attempt >= _options.MaxAttempts)
+        if (job.Attempt >= options.MaxAttempts)
         {
             job.Status = IngestionJobStatus.Failed;
             job.Error = ex.Message;
@@ -122,7 +151,7 @@ LIMIT 1";
         {
             job.Status = IngestionJobStatus.Pending;
             job.Error = ex.Message;
-            job.AvailableAt = DateTimeOffset.UtcNow.Add(ProcessingLogic.ComputeBackoff(job.Attempt, _options.BaseBackoffSeconds));
+            job.AvailableAt = DateTimeOffset.UtcNow.Add(ProcessingLogic.ComputeBackoff(job.Attempt, options.BaseBackoffSeconds));
         }
 
         await db.SaveChangesAsync(ct);
