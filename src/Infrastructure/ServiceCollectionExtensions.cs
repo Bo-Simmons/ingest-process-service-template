@@ -18,7 +18,8 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         var connectionString = DbConnectionFactory.ResolveConnectionString(configuration);
-        services.AddDbContext<IngestionDbContext>(opt => opt.UseNpgsql(connectionString));
+        services.AddDbContext<IngestionDbContext>(opt =>
+            opt.UseNpgsql(connectionString, npgsql => npgsql.MigrationsAssembly("Infrastructure")));
         services.AddScoped<IIngestionJobRepository, IngestionJobRepository>();
         services.AddScoped<IRawEventRepository, RawEventRepository>();
         services.AddScoped<IIngestionResultRepository, IngestionResultRepository>();

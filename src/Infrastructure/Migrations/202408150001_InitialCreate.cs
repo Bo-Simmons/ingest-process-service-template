@@ -1,3 +1,6 @@
+using Infrastructure;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -7,6 +10,8 @@ namespace Infrastructure.Migrations;
 /// <summary>
 /// Initial schema migration that creates ingestion jobs, raw events, and result tables.
 /// </summary>
+[DbContext(typeof(IngestionDbContext))]
+[Migration("202408150001_InitialCreate")]
 public partial class InitialCreate : Migration
 {
     /// <summary>
