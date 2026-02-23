@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
-using Microsoft.Extensions.Configuration;
 
 namespace Infrastructure;
 
@@ -11,16 +10,15 @@ public sealed class IngestionDbContextFactory : IDesignTimeDbContextFactory<Inge
 {
     public IngestionDbContext CreateDbContext(string[] args)
     {
-        var configuration = new ConfigurationBuilder()
-            .AddEnvironmentVariables()
-            .Build();
-
-        var connectionString = DbConnectionFactory.ResolveConnectionString(configuration);
+        var connectionString =
+            Environment.GetEnvironmentVariable("ConnectionStrings__Db")
+            ?? Environment.GetEnvironmentVariable("ConnectionStrings:Db")
+            ?? throw new InvalidOperationException(
+                "Design-time database connection string is missing. Set ConnectionStrings__Db environment variable.");
 
         var optionsBuilder = new DbContextOptionsBuilder<IngestionDbContext>();
         optionsBuilder
-            .UseNpgsql(connectionString, x => x.MigrationsAssembly("Infrastructure"))
-            .UseSnakeCaseNamingConvention();
+            .UseNpgsql(connectionString, x => x.MigrationsAssembly("Infrastructure"));
 
         return new IngestionDbContext(optionsBuilder.Options);
     }
