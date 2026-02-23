@@ -35,11 +35,6 @@ public sealed record JobStatusResponse(
     string? Error);
 
 /// <summary>
-/// Represents one aggregated result row: event type + how many times it appeared.
-/// </summary>
-public sealed record ResultItem(string EventType, int Count);
-
-/// <summary>
 /// Represents the complete list of result rows for a given job.
 /// </summary>
 public sealed record JobResultsResponse(Guid JobId, IReadOnlyList<ResultItem> Results);

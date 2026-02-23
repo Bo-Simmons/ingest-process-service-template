@@ -1,3 +1,5 @@
+using Application;
+
 namespace Application.Abstractions;
 
 public interface IIngestionResultRepository
