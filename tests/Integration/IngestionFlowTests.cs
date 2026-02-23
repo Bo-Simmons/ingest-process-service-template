@@ -65,6 +65,27 @@ public sealed class IngestionFlowTests : IClassFixture<TestApiFactory>
         results.Results.Should().ContainEquivalentOf(new Api.Contracts.ResultItem("viewed", 1));
     }
 
+    [Fact]
+    public void IdempotencyLookup_UsesSnakeCaseColumnsInGeneratedSql()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<IngestionDbContext>();
+
+        var sql = db.IngestionJobs
+            .AsNoTracking()
+            .Where(x => x.TenantId == "tenant-a" && x.IdempotencyKey == "idem-1")
+            .Select(x => x.Id)
+            .ToQueryString();
+
+        sql.Should().Contain("ingestion_jobs");
+        sql.Should().Contain("tenant_id");
+        sql.Should().Contain("idempotency_key");
+        sql.Should().Contain("id");
+        sql.Should().NotContain("\"TenantId\"");
+        sql.Should().NotContain("\"IdempotencyKey\"");
+        sql.Should().NotContain("\"Id\"");
+    }
+
     /// <summary>
     /// Simulates worker behavior directly in test scope so test can validate API contracts.
     /// </summary>
