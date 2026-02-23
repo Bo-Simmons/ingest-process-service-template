@@ -1,5 +1,5 @@
+using Application.Abstractions;
 using Domain;
-using Microsoft.EntityFrameworkCore;
 
 namespace Application;
 
@@ -10,23 +10,16 @@ public interface IIngestionService
     Task<JobResultsResponse?> GetResultsAsync(Guid jobId, CancellationToken ct);
 }
 
-public interface IIngestionStore
-{
-    Task<Guid?> FindJobIdByTenantAndIdempotencyAsync(string tenantId, string idempotencyKey, CancellationToken ct);
-    void AddJob(IngestionJob job);
-    Task SaveChangesAsync(CancellationToken ct);
-    Task<IngestionJob?> GetJobAsync(Guid jobId, CancellationToken ct);
-    Task<bool> JobExistsAsync(Guid jobId, CancellationToken ct);
-    Task<IReadOnlyList<ResultItem>> GetResultsAsync(Guid jobId, CancellationToken ct);
-}
-
-public sealed class IngestionService(IIngestionStore store) : IIngestionService
+public sealed class IngestionService(
+    IIngestionJobRepository ingestionJobRepository,
+    IRawEventRepository rawEventRepository,
+    IIngestionResultRepository ingestionResultRepository) : IIngestionService
 {
     public async Task<SubmitIngestionResponse> SubmitAsync(SubmitIngestionRequest request, string? idempotencyKey, CancellationToken ct)
     {
         if (!string.IsNullOrWhiteSpace(idempotencyKey))
         {
-            var existingJobId = await store.FindJobIdByTenantAndIdempotencyAsync(request.TenantId, idempotencyKey, ct);
+            var existingJobId = await ingestionJobRepository.FindJobIdByTenantAndIdempotencyAsync(request.TenantId, idempotencyKey, ct);
             if (existingJobId.HasValue)
             {
                 return new SubmitIngestionResponse(existingJobId.Value, true);
@@ -46,32 +39,23 @@ public sealed class IngestionService(IIngestionStore store) : IIngestionService
             AvailableAt = now
         };
 
-        foreach (var evt in request.Events)
-        {
-            job.RawEvents.Add(new RawEvent
-            {
-                TenantId = request.TenantId,
-                Type = evt.Type,
-                Timestamp = evt.Timestamp,
-                PayloadJson = evt.Payload.GetRawText()
-            });
-        }
+        ingestionJobRepository.Add(job);
 
-        store.AddJob(job);
-
-        try
+        var rawEvents = request.Events.Select(evt => new RawEvent
         {
-            await store.SaveChangesAsync(ct);
-        }
-        catch (DbUpdateException) when (!string.IsNullOrWhiteSpace(idempotencyKey))
-        {
-            var existingJobId = await store.FindJobIdByTenantAndIdempotencyAsync(request.TenantId, idempotencyKey!, ct);
-            if (existingJobId.HasValue)
-            {
-                return new SubmitIngestionResponse(existingJobId.Value, true);
-            }
+            JobId = job.Id,
+            TenantId = request.TenantId,
+            Type = evt.Type,
+            Timestamp = evt.Timestamp,
+            PayloadJson = evt.Payload.GetRawText()
+        });
 
-            throw;
+        rawEventRepository.AddRange(rawEvents);
+
+        var saveResult = await ingestionJobRepository.SaveSubmissionAsync(request.TenantId, idempotencyKey, ct);
+        if (saveResult.Outcome == SaveSubmissionOutcome.Duplicate && saveResult.ExistingJobId.HasValue)
+        {
+            return new SubmitIngestionResponse(saveResult.ExistingJobId.Value, true);
         }
 
         return new SubmitIngestionResponse(job.Id, false);
@@ -79,7 +63,7 @@ public sealed class IngestionService(IIngestionStore store) : IIngestionService
 
     public async Task<JobStatusResponse?> GetStatusAsync(Guid jobId, CancellationToken ct)
     {
-        var job = await store.GetJobAsync(jobId, ct);
+        var job = await ingestionJobRepository.GetByIdAsync(jobId, ct);
         if (job is null)
         {
             return null;
@@ -90,13 +74,13 @@ public sealed class IngestionService(IIngestionStore store) : IIngestionService
 
     public async Task<JobResultsResponse?> GetResultsAsync(Guid jobId, CancellationToken ct)
     {
-        var exists = await store.JobExistsAsync(jobId, ct);
+        var exists = await ingestionJobRepository.ExistsAsync(jobId, ct);
         if (!exists)
         {
             return null;
         }
 
-        var results = await store.GetResultsAsync(jobId, ct);
+        var results = await ingestionResultRepository.GetByJobIdAsync(jobId, ct);
         return new JobResultsResponse(jobId, results);
     }
 }
