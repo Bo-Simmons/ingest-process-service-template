@@ -62,7 +62,7 @@ public sealed class IngestionDbContext : DbContext
             e.Property(x => x.TenantId).HasColumnName("tenant_id").HasMaxLength(128).IsRequired();
             e.Property(x => x.Type).HasColumnName("type").HasMaxLength(128).IsRequired();
             e.Property(x => x.Timestamp).HasColumnName("timestamp");
-            e.Property(x => x.PayloadJson).HasColumnName("payload_json").IsRequired();
+            e.Property(x => x.Payload).HasColumnName("payload_json").HasColumnType("jsonb").IsRequired();
             e.HasIndex(x => x.JobId);
             e.HasOne(x => x.Job).WithMany(x => x.RawEvents).HasForeignKey(x => x.JobId);
         });

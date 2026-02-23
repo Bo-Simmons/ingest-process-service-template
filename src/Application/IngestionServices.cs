@@ -47,7 +47,7 @@ public sealed class IngestionService(
             TenantId = request.TenantId,
             Type = evt.Type,
             Timestamp = evt.Timestamp,
-            PayloadJson = evt.Payload.GetRawText()
+            Payload = evt.Payload.Clone()
         });
 
         rawEventRepository.AddRange(rawEvents);
