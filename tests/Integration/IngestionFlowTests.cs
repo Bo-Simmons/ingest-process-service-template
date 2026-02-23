@@ -132,7 +132,8 @@ public sealed class TestApiFactory : WebApplicationFactory<Program>, IDisposable
 
             using var scope = services.BuildServiceProvider().CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<IngestionDbContext>();
-            db.Database.EnsureCreated();
+            db.Database.EnsureDeleted();
+            db.Database.Migrate();
         });
     }
 
