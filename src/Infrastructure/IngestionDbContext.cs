@@ -6,8 +6,12 @@ namespace Infrastructure;
 /// <summary>
 /// EF Core database context for ingestion jobs, raw events, and aggregated results.
 /// </summary>
-public sealed class IngestionDbContext(DbContextOptions<IngestionDbContext> options) : DbContext(options)
+public sealed class IngestionDbContext : DbContext
 {
+    public IngestionDbContext(DbContextOptions<IngestionDbContext> options)
+        : base(options)
+    {
+    }
     /// <summary>
     /// Table access for ingestion job records.
     /// </summary>
