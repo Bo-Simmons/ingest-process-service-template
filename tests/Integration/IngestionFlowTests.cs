@@ -57,23 +57,23 @@ public sealed class IngestionFlowTests : IClassFixture<IntegrationTestFixture>, 
         };
 
         var post = await client.PostAsJsonAsync("/v1/ingestions", payload);
-        var postRawBody = await post.Content.ReadAsStringAsync();
-        post.StatusCode.Should().Be(HttpStatusCode.Accepted, "body: {0}", postRawBody);
+        var responseBody = await post.Content.ReadAsStringAsync();
+        post.StatusCode.Should().Be(HttpStatusCode.Accepted, "POST body: {0}", responseBody);
         var postBody = await post.Content.ReadFromJsonAsync<JobCreateResponse>();
         postBody.Should().NotBeNull();
 
         await SimulateWorker(postBody!.JobId);
 
         var statusResponse = await client.GetAsync($"/v1/ingestions/{postBody.JobId}");
-        var statusRawBody = await statusResponse.Content.ReadAsStringAsync();
-        statusResponse.StatusCode.Should().Be(HttpStatusCode.OK, "body: {0}", statusRawBody);
+        var statusResponseBody = await statusResponse.Content.ReadAsStringAsync();
+        statusResponse.StatusCode.Should().Be(HttpStatusCode.OK, "GET status body: {0}", statusResponseBody);
         var status = await statusResponse.Content.ReadFromJsonAsync<JobStatusResponse>();
         status.Should().NotBeNull();
         status!.Status.Should().Be(nameof(IngestionJobStatus.Succeeded));
 
         var resultsResponse = await client.GetAsync($"/v1/results/{postBody.JobId}");
-        var resultsRawBody = await resultsResponse.Content.ReadAsStringAsync();
-        resultsResponse.StatusCode.Should().Be(HttpStatusCode.OK, "body: {0}", resultsRawBody);
+        var resultsResponseBody = await resultsResponse.Content.ReadAsStringAsync();
+        resultsResponse.StatusCode.Should().Be(HttpStatusCode.OK, "GET results body: {0}", resultsResponseBody);
         var results = await resultsResponse.Content.ReadFromJsonAsync<JobResultsResponse>();
         results.Should().NotBeNull();
         results!.Results.Should().ContainEquivalentOf(new Api.Contracts.ResultItem("clicked", 2));
