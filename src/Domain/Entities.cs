@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace Domain;
 
 /// <summary>
@@ -139,9 +141,9 @@ public sealed class RawEvent
     public DateTimeOffset Timestamp { get; set; }
 
     /// <summary>
-    /// Raw JSON payload as a string for flexible schema handling.
+    /// Raw JSON payload captured exactly as sent by the client.
     /// </summary>
-    public string PayloadJson { get; set; } = "{}";
+    public JsonElement Payload { get; set; } = JsonSerializer.SerializeToElement(new { });
 }
 
 /// <summary>
