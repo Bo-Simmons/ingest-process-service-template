@@ -35,7 +35,7 @@ public sealed class IngestionDbContext(DbContextOptions<IngestionDbContext> opti
             e.Property(x => x.TenantId).HasMaxLength(128).IsRequired();
             e.Property(x => x.IdempotencyKey).HasMaxLength(256);
             e.Property(x => x.Status).HasConversion<string>().HasMaxLength(24);
-            e.HasIndex(x => new { x.TenantId, x.IdempotencyKey }).IsUnique().HasFilter("\"idempotency_key\" IS NOT NULL");
+            e.HasIndex(x => new { x.TenantId, x.IdempotencyKey }).IsUnique();
             e.HasIndex(x => new { x.Status, x.AvailableAt });
         });
 

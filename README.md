@@ -63,6 +63,16 @@ dotnet test
 - Attach a managed Postgres database and set `ConnectionStrings__Db`.
 - Internal app port is `8080`.
 
+## Reset local DB
+
+If you have an older local schema with mismatched identifier casing, reset the database and re-apply migrations:
+
+```bash
+dropdb ingest_process
+createdb ingest_process
+dotnet ef database update --project src/Infrastructure/Infrastructure.csproj --startup-project src/Api/Api.csproj
+```
+
 ## Migrations
 
 API runs `db.Database.Migrate()` on startup.
