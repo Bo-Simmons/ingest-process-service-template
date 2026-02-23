@@ -64,12 +64,12 @@ using (var scope = app.Services.CreateScope())
 // Endpoints
 app.MapHealthChecks("/health/live", new HealthCheckOptions
 {
-    Predicate = registration => registration.Name == "live"
+    Predicate = r => r.Name == "live"
 });
 
 app.MapHealthChecks("/health/ready", new HealthCheckOptions
 {
-    Predicate = registration => registration.Name == "ready"
+    Predicate = r => r.Name == "ready"
 });
 
 app.MapControllers();
