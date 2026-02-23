@@ -37,10 +37,11 @@ public sealed class IngestionDbContext : DbContext
         {
             e.ToTable("ingestion_jobs");
             e.HasKey(x => x.Id);
+
             e.Property(x => x.Id).HasColumnName("id");
             e.Property(x => x.TenantId).HasColumnName("tenant_id").HasMaxLength(128).IsRequired();
             e.Property(x => x.IdempotencyKey).HasColumnName("idempotency_key").HasMaxLength(256);
-            e.Property(x => x.Status).HasColumnName("status").HasConversion<string>().HasMaxLength(24);
+            e.Property(x => x.Status).HasColumnName("status").HasConversion<string>().HasMaxLength(24).IsRequired();
             e.Property(x => x.Attempt).HasColumnName("attempt");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
@@ -49,34 +50,50 @@ public sealed class IngestionDbContext : DbContext
             e.Property(x => x.LockedBy).HasColumnName("locked_by");
             e.Property(x => x.Error).HasColumnName("error");
             e.Property(x => x.ProcessedAt).HasColumnName("processed_at");
-            e.HasIndex(x => new { x.TenantId, x.IdempotencyKey }).IsUnique();
-            e.HasIndex(x => new { x.Status, x.AvailableAt });
+
+            e.HasIndex(x => new { x.Status, x.AvailableAt })
+                .HasDatabaseName("ix_ingestion_jobs_status_available_at");
+
+            e.HasIndex(x => new { x.TenantId, x.IdempotencyKey })
+                .HasDatabaseName("ix_ingestion_jobs_tenant_id_idempotency_key")
+                .IsUnique()
+                .HasFilter("idempotency_key IS NOT NULL");
         });
 
         modelBuilder.Entity<RawEvent>(e =>
         {
             e.ToTable("raw_events");
             e.HasKey(x => x.Id);
+
             e.Property(x => x.Id).HasColumnName("id");
             e.Property(x => x.JobId).HasColumnName("job_id");
             e.Property(x => x.TenantId).HasColumnName("tenant_id").HasMaxLength(128).IsRequired();
             e.Property(x => x.Type).HasColumnName("type").HasMaxLength(128).IsRequired();
             e.Property(x => x.Timestamp).HasColumnName("timestamp");
             e.Property(x => x.Payload).HasColumnName("payload_json").HasColumnType("jsonb").IsRequired();
-            e.HasIndex(x => x.JobId);
-            e.HasOne(x => x.Job).WithMany(x => x.RawEvents).HasForeignKey(x => x.JobId);
+
+            e.HasIndex(x => x.JobId).HasDatabaseName("ix_raw_events_job_id");
+            e.HasOne(x => x.Job)
+                .WithMany(x => x.RawEvents)
+                .HasForeignKey(x => x.JobId)
+                .HasConstraintName("fk_raw_events_ingestion_jobs_job_id");
         });
 
         modelBuilder.Entity<IngestionResult>(e =>
         {
             e.ToTable("ingestion_results");
             e.HasKey(x => x.Id);
+
             e.Property(x => x.Id).HasColumnName("id");
             e.Property(x => x.JobId).HasColumnName("job_id");
             e.Property(x => x.EventType).HasColumnName("event_type").HasMaxLength(128).IsRequired();
             e.Property(x => x.Count).HasColumnName("count");
-            e.HasIndex(x => x.JobId);
-            e.HasOne(x => x.Job).WithMany(x => x.Results).HasForeignKey(x => x.JobId);
+
+            e.HasIndex(x => x.JobId).HasDatabaseName("ix_ingestion_results_job_id");
+            e.HasOne(x => x.Job)
+                .WithMany(x => x.Results)
+                .HasForeignKey(x => x.JobId)
+                .HasConstraintName("fk_ingestion_results_ingestion_jobs_job_id");
         });
     }
 }
