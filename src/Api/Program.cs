@@ -2,29 +2,35 @@ using Api.Health;
 using Application;
 using Infrastructure;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Serilog;
 using Serilog.Formatting.Compact;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Configuration + logging
 builder.Services.Configure<WorkerOptions>(builder.Configuration);
+
 builder.Host.UseSerilog((ctx, cfg) =>
 {
     var level = ctx.Configuration["LOG_LEVEL"] ?? "Information";
+
     cfg.MinimumLevel.Is(Enum.Parse<Serilog.Events.LogEventLevel>(level, true))
        .Enrich.FromLogContext()
        .WriteTo.Console(new RenderedCompactJsonFormatter());
 });
 
+// Service registration
 builder.Services.AddProblemDetails();
 builder.Services.AddControllers();
 builder.Services.AddInfrastructure(builder.Configuration);
+
 builder.Services.AddHealthChecks()
     .AddCheck("live", () => HealthCheckResult.Healthy())
     .AddCheck<DbReadyHealthCheck>("ready");
 
+// App pipeline
 var app = builder.Build();
 
 app.Use(async (context, next) =>
@@ -34,6 +40,7 @@ app.Use(async (context, next) =>
         : Guid.NewGuid().ToString("n");
 
     context.Response.Headers["X-Correlation-Id"] = correlationId;
+
     using (Serilog.Context.LogContext.PushProperty("CorrelationId", correlationId))
     {
         await next();
@@ -42,9 +49,11 @@ app.Use(async (context, next) =>
 
 app.UseExceptionHandler();
 
+// Optional startup migrations
 using (var scope = app.Services.CreateScope())
 {
     var shouldRunMigrations = builder.Configuration.GetValue<bool>("RUN_MIGRATIONS_ON_STARTUP");
+
     if (shouldRunMigrations)
     {
         var db = scope.ServiceProvider.GetRequiredService<IngestionDbContext>();
@@ -52,14 +61,17 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
+// Endpoints
 app.MapHealthChecks("/health/live", new HealthCheckOptions
 {
     Predicate = registration => registration.Name == "live"
 });
+
 app.MapHealthChecks("/health/ready", new HealthCheckOptions
 {
     Predicate = registration => registration.Name == "ready"
 });
+
 app.MapControllers();
 
 app.Run();

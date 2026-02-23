@@ -1,4 +1,5 @@
 name: ingest-process-service
+
 services:
   - name: api
     environment_slug: docker
@@ -18,6 +19,7 @@ services:
         value: "5"
       - key: BASE_BACKOFF_SECONDS
         value: "2"
+
 workers:
   - name: worker
     environment_slug: docker
