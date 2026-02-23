@@ -1,43 +1,49 @@
 using System.Linq;
+using System.Net;
 using System.Net.Http.Json;
 using Api.Contracts;
 using Application;
 using Domain;
 using FluentAssertions;
 using Infrastructure;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
-using System.Net;
 using Xunit;
+using Xunit.Sdk;
 
 namespace Integration;
 
 /// <summary>
-/// End-to-end integration tests for API ingestion flow using an in-memory SQLite DB.
+/// End-to-end integration tests for API ingestion flow using PostgreSQL.
 /// </summary>
-public sealed class IngestionFlowTests : IClassFixture<TestApiFactory>
+public sealed class IngestionFlowTests : IClassFixture<IntegrationTestFixture>, IAsyncLifetime
 {
-    private readonly TestApiFactory _factory;
+    private readonly IntegrationTestFixture _fixture;
 
     /// <summary>
-    /// Stores test server factory reference for creating HTTP clients and service scopes.
+    /// Stores test server fixture reference for creating HTTP clients and service scopes.
     /// </summary>
-    public IngestionFlowTests(TestApiFactory factory)
+    public IngestionFlowTests(IntegrationTestFixture fixture)
     {
-        _factory = factory;
+        _fixture = fixture;
     }
+
+    public async Task InitializeAsync()
+    {
+        await _fixture.ResetDatabaseAsync();
+    }
+
+    public Task DisposeAsync() => Task.CompletedTask;
 
     /// <summary>
     /// Verifies post-ingestion, process, status, and results retrieval flow.
     /// </summary>
-    [Fact]
+    [PostgresIntegrationFact]
     public async Task PostIngestion_ProcessJob_GetResults()
     {
-        var client = _factory.CreateClient();
+        EnsureIntegrationConfigured();
+
+        var client = _fixture.Client;
 
         var payload = new
         {
@@ -74,10 +80,12 @@ public sealed class IngestionFlowTests : IClassFixture<TestApiFactory>
         results.Results.Should().ContainEquivalentOf(new Api.Contracts.ResultItem("viewed", 1));
     }
 
-    [Fact]
+    [PostgresIntegrationFact]
     public void IdempotencyLookup_UsesSnakeCaseColumnsInGeneratedSql()
     {
-        using var scope = _factory.Services.CreateScope();
+        EnsureIntegrationConfigured();
+
+        using var scope = _fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<IngestionDbContext>();
 
         var sql = db.IngestionJobs
@@ -95,12 +103,20 @@ public sealed class IngestionFlowTests : IClassFixture<TestApiFactory>
         sql.Should().NotContain("\"Id\"");
     }
 
+    private void EnsureIntegrationConfigured()
+    {
+        if (_fixture.ShouldSkip)
+        {
+            throw new SkipException(_fixture.SkipReason);
+        }
+    }
+
     /// <summary>
     /// Simulates worker behavior directly in test scope so test can validate API contracts.
     /// </summary>
     private async Task SimulateWorker(Guid jobId)
     {
-        using var scope = _factory.Services.CreateScope();
+        using var scope = _fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<IngestionDbContext>();
         var job = await db.IngestionJobs.Include(x => x.RawEvents).FirstAsync(x => x.Id == jobId);
 
@@ -114,42 +130,5 @@ public sealed class IngestionFlowTests : IClassFixture<TestApiFactory>
         job.ProcessedAt = DateTimeOffset.UtcNow;
         job.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync();
-    }
-
-}
-
-/// <summary>
-/// Custom WebApplicationFactory that swaps PostgreSQL with in-memory SQLite for tests.
-/// </summary>
-public sealed class TestApiFactory : WebApplicationFactory<Program>, IDisposable
-{
-    private readonly SqliteConnection _connection = new("Data Source=:memory:");
-
-    /// <summary>
-    /// Reconfigures DI services for test hosting and ensures schema creation.
-    /// </summary>
-    protected override void ConfigureWebHost(IWebHostBuilder builder)
-    {
-        _connection.Open();
-        builder.ConfigureServices(services =>
-        {
-            services.RemoveAll<IngestionDbContext>();
-            services.RemoveAll<DbContextOptions<IngestionDbContext>>();
-            services.RemoveAll<IDbContextFactory<IngestionDbContext>>();
-            services.AddDbContext<IngestionDbContext>(opt => opt.UseSqlite(_connection));
-
-            using var scope = services.BuildServiceProvider().CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<IngestionDbContext>();
-            db.Database.EnsureCreated();
-        });
-    }
-
-    /// <summary>
-    /// Cleans up SQLite connection when test host is disposed.
-    /// </summary>
-    protected override void Dispose(bool disposing)
-    {
-        base.Dispose(disposing);
-        _connection.Dispose();
     }
 }
