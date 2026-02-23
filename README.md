@@ -32,9 +32,30 @@ Environment variables:
 - `MAX_ATTEMPTS`
 - `BASE_BACKOFF_SECONDS`
 - `LOG_LEVEL`
-- `ASPNETCORE_URLS=http://+:8080`
+- `RUN_MIGRATIONS_ON_STARTUP`
+- `ASPNETCORE_URLS` / `PORT` (port binding notes below)
 
-## Local run (docker compose)
+## Run locally without Docker (`dotnet run`)
+
+By default, the API listens on `http://localhost:5000` when running locally unless you override URLs.
+
+```bash
+dotnet run --project src/Api/Api.csproj
+```
+
+Optional explicit override (local):
+
+```bash
+ASPNETCORE_URLS=http://localhost:5000 dotnet run --project src/Api/Api.csproj
+```
+
+Run the worker in a second terminal:
+
+```bash
+dotnet run --project src/Worker/Worker.csproj
+```
+
+## Run with Docker Compose
 
 ```bash
 docker compose up --build
@@ -48,20 +69,41 @@ Run smoke test:
 ./scripts/smoke.sh http://localhost:8080
 ```
 
+## Ports and deployment (container/App Platform)
+
+- Containerized API is configured to listen on `0.0.0.0:8080` (`ASPNETCORE_URLS=http://+:8080`).
+- `Dockerfile.api` exposes port `8080`.
+- `app.yaml` sets `http_port: 8080`, which matches DigitalOcean App Platform's default expectation for HTTP services.
+- If your platform injects `PORT`, ensure your runtime binding resolves to `0.0.0.0:8080` (or keep `ASPNETCORE_URLS=http://+:8080`).
+
 ## Tests
+
+Run all tests:
 
 ```bash
 dotnet test
 ```
 
-- Unit tests validate aggregation + backoff logic.
-- Integration test uses **SQLite fallback** (for CI environments where Docker/Testcontainers may be unavailable), and simulates worker processing after API submission.
+- Unit tests always run.
+- Integration tests are PostgreSQL-based and run only when `ConnectionStrings__Db` is set.
+- If `ConnectionStrings__Db` is not set, integration tests are skipped.
+- Use a dedicated test database (recommended), for example:
 
-## Deployment notes (DigitalOcean App Platform)
+```bash
+ConnectionStrings__Db="Host=localhost;Port=5432;Database=ingest_process_test;Username=postgres;Password=postgres"
+```
 
-- `app.yaml` defines one web service (`Dockerfile.api`) and one worker (`Dockerfile.worker`).
-- Attach a managed Postgres database and set `ConnectionStrings__Db`.
-- Internal app port is `8080`.
+Windows helper script:
+
+```powershell
+./scripts/test.ps1
+```
+
+See script options with:
+
+```powershell
+./scripts/test.ps1 -Help
+```
 
 ## Reset local DB
 
@@ -75,5 +117,5 @@ dotnet ef database update --project src/Infrastructure/Infrastructure.csproj --s
 
 ## Migrations
 
-API runs `db.Database.Migrate()` on startup.
+API runs `db.Database.Migrate()` on startup when `RUN_MIGRATIONS_ON_STARTUP=true`.
 Initial migration is included under `src/Infrastructure/Migrations`.
