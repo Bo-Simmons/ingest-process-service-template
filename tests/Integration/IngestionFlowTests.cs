@@ -9,7 +9,6 @@ using Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
-using Xunit.Sdk;
 
 namespace Integration;
 
@@ -41,7 +40,6 @@ public sealed class IngestionFlowTests : IClassFixture<IntegrationTestFixture>, 
     [PostgresIntegrationFact]
     public async Task PostIngestion_ProcessJob_GetResults()
     {
-        EnsureIntegrationConfigured();
 
         var client = _fixture.Client;
 
@@ -83,7 +81,6 @@ public sealed class IngestionFlowTests : IClassFixture<IntegrationTestFixture>, 
     [PostgresIntegrationFact]
     public void IdempotencyLookup_UsesSnakeCaseColumnsInGeneratedSql()
     {
-        EnsureIntegrationConfigured();
 
         using var scope = _fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<IngestionDbContext>();
@@ -103,13 +100,6 @@ public sealed class IngestionFlowTests : IClassFixture<IntegrationTestFixture>, 
         sql.Should().NotContain("\"Id\"");
     }
 
-    private void EnsureIntegrationConfigured()
-    {
-        if (_fixture.ShouldSkip)
-        {
-            throw new SkipException(_fixture.SkipReason);
-        }
-    }
 
     /// <summary>
     /// Simulates worker behavior directly in test scope so test can validate API contracts.
