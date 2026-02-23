@@ -55,6 +55,7 @@ public sealed class IntegrationTestFixture : WebApplicationFactory<Program>, IAs
 
         using var scope = Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<IngestionDbContext>();
+        Console.WriteLine($"EF Provider: {db.Database.ProviderName}");
         await db.Database.MigrateAsync();
         await ResetDatabaseAsync();
     }
