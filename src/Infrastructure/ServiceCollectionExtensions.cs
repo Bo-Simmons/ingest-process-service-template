@@ -20,7 +20,8 @@ public static class ServiceCollectionExtensions
         var connectionString = DbConnectionFactory.ResolveConnectionString(configuration);
 
         services.AddDbContext<IngestionDbContext>(opt =>
-            opt.UseNpgsql(connectionString, npgsql => npgsql.MigrationsAssembly("Infrastructure")));
+            opt.UseNpgsql(connectionString, npgsql => npgsql.MigrationsAssembly("Infrastructure"))
+                .UseSnakeCaseNamingConvention());
 
         services.AddScoped<IIngestionJobRepository, IngestionJobRepository>();
         services.AddScoped<IRawEventRepository, RawEventRepository>();
