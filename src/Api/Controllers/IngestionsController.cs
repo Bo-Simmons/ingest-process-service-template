@@ -17,7 +17,15 @@ public sealed class IngestionsController(IIngestionService ingestionService) : C
         var errors = request.Validate();
         if (errors.Count > 0)
         {
-            return ValidationProblem(errors);
+            foreach (var error in errors)
+            {
+                foreach (var message in error.Value)
+                {
+                    ModelState.AddModelError(error.Key, message);
+                }
+            }
+
+            return ValidationProblem(ModelState);
         }
 
         var response = await ingestionService.SubmitAsync(

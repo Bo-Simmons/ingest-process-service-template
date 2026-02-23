@@ -37,7 +37,7 @@ public sealed record JobStatusDto(
 /// <summary>
 /// Represents the complete list of result rows for a given job.
 /// </summary>
-public sealed record JobResultsDto(Guid JobId, IReadOnlyList<ResultItem> Results);
+public sealed record JobResultsDto(Guid JobId, IReadOnlyList<ProcessingResultItem> Results);
 
 /// <summary>
 /// Represents worker runtime configuration values loaded from settings.
@@ -70,11 +70,11 @@ public static class ProcessingLogic
     /// Groups events by type (case-insensitive), counts each group, and returns stable sorted output.
     /// This makes result lists deterministic and easier to test.
     /// </summary>
-    public static IReadOnlyList<ResultItem> AggregateByEventType(IEnumerable<RawEvent> events)
+    public static IReadOnlyList<ProcessingResultItem> AggregateByEventType(IEnumerable<RawEvent> events)
     {
         return events
             .GroupBy(e => e.Type, StringComparer.OrdinalIgnoreCase)
-            .Select(g => new ResultItem(g.Key, g.Count()))
+            .Select(g => new ProcessingResultItem(g.Key, g.Count()))
             .OrderBy(x => x.EventType, StringComparer.OrdinalIgnoreCase)
             .ToList();
     }
