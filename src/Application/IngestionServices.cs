@@ -6,8 +6,8 @@ namespace Application;
 public interface IIngestionService
 {
     Task<SubmitIngestionResponse> SubmitAsync(SubmitIngestionRequest request, string? idempotencyKey, CancellationToken ct);
-    Task<JobStatusResponse?> GetStatusAsync(Guid jobId, CancellationToken ct);
-    Task<JobResultsResponse?> GetResultsAsync(Guid jobId, CancellationToken ct);
+    Task<JobStatusDto?> GetStatusAsync(Guid jobId, CancellationToken ct);
+    Task<JobResultsDto?> GetResultsAsync(Guid jobId, CancellationToken ct);
 }
 
 public sealed class IngestionService(
@@ -61,7 +61,7 @@ public sealed class IngestionService(
         return new SubmitIngestionResponse(job.Id, false);
     }
 
-    public async Task<JobStatusResponse?> GetStatusAsync(Guid jobId, CancellationToken ct)
+    public async Task<JobStatusDto?> GetStatusAsync(Guid jobId, CancellationToken ct)
     {
         var job = await ingestionJobRepository.GetByIdAsync(jobId, ct);
         if (job is null)
@@ -69,10 +69,10 @@ public sealed class IngestionService(
             return null;
         }
 
-        return new JobStatusResponse(job.Id, job.Status.ToString(), job.Attempt, job.CreatedAt, job.UpdatedAt, job.ProcessedAt, job.Error);
+        return new JobStatusDto(job.Id, job.Status.ToString(), job.Attempt, job.CreatedAt, job.UpdatedAt, job.ProcessedAt, job.Error);
     }
 
-    public async Task<JobResultsResponse?> GetResultsAsync(Guid jobId, CancellationToken ct)
+    public async Task<JobResultsDto?> GetResultsAsync(Guid jobId, CancellationToken ct)
     {
         var exists = await ingestionJobRepository.ExistsAsync(jobId, ct);
         if (!exists)
@@ -81,6 +81,6 @@ public sealed class IngestionService(
         }
 
         var results = await ingestionResultRepository.GetByJobIdAsync(jobId, ct);
-        return new JobResultsResponse(jobId, results);
+        return new JobResultsDto(jobId, results);
     }
 }

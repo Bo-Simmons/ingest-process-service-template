@@ -25,7 +25,7 @@ public sealed record SubmitIngestionResponse(Guid JobId, bool IsDuplicate);
 /// Represents the current processing status of a job.
 /// This is what callers use to poll for progress.
 /// </summary>
-public sealed record JobStatusResponse(
+public sealed record JobStatusDto(
     Guid JobId,
     string Status,
     int Attempt,
@@ -37,7 +37,7 @@ public sealed record JobStatusResponse(
 /// <summary>
 /// Represents the complete list of result rows for a given job.
 /// </summary>
-public sealed record JobResultsResponse(Guid JobId, IReadOnlyList<ResultItem> Results);
+public sealed record JobResultsDto(Guid JobId, IReadOnlyList<ResultItem> Results);
 
 /// <summary>
 /// Represents worker runtime configuration values loaded from settings.
