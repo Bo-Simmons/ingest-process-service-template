@@ -52,14 +52,8 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-app.MapHealthChecks("/health/live", new HealthCheckOptions
-{
-    Predicate = registration => registration.Name == "live"
-});
-app.MapHealthChecks("/health/ready", new HealthCheckOptions
-{
-    Predicate = registration => registration.Name == "ready"
-});
+app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = r => r.Name == "live" });
+app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = r => r.Name == "ready" });
 app.MapControllers();
 
 app.Run();
