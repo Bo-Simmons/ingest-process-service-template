@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Xunit;
 
 namespace Integration;
@@ -124,8 +125,9 @@ public sealed class TestApiFactory : WebApplicationFactory<Program>, IDisposable
         _connection.Open();
         builder.ConfigureServices(services =>
         {
-            var descriptor = services.Single(d => d.ServiceType == typeof(DbContextOptions<IngestionDbContext>));
-            services.Remove(descriptor);
+            services.RemoveAll<IngestionDbContext>();
+            services.RemoveAll<DbContextOptions<IngestionDbContext>>();
+            services.RemoveAll<IDbContextFactory<IngestionDbContext>>();
             services.AddDbContext<IngestionDbContext>(opt => opt.UseSqlite(_connection));
 
             using var scope = services.BuildServiceProvider().CreateScope();
