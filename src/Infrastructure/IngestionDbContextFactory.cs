@@ -16,9 +16,11 @@ public sealed class IngestionDbContextFactory : IDesignTimeDbContextFactory<Inge
             ?? throw new InvalidOperationException(
                 "Design-time database connection string is missing. Set ConnectionStrings__Db environment variable.");
 
+        var normalizedConnectionString = DbConnectionFactory.NormalizePostgresConnectionString(connectionString);
+
         var optionsBuilder = new DbContextOptionsBuilder<IngestionDbContext>();
         optionsBuilder
-            .UseNpgsql(connectionString, x => x.MigrationsAssembly("Infrastructure"));
+            .UseNpgsql(normalizedConnectionString, x => x.MigrationsAssembly("Infrastructure"));
 
         return new IngestionDbContext(optionsBuilder.Options);
     }
