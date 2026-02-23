@@ -12,6 +12,7 @@ public sealed class IngestionDbContext : DbContext
         : base(options)
     {
     }
+
     /// <summary>
     /// Table access for ingestion job records.
     /// </summary>
@@ -36,9 +37,18 @@ public sealed class IngestionDbContext : DbContext
         {
             e.ToTable("ingestion_jobs");
             e.HasKey(x => x.Id);
-            e.Property(x => x.TenantId).HasMaxLength(128).IsRequired();
-            e.Property(x => x.IdempotencyKey).HasMaxLength(256);
-            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(24);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.TenantId).HasColumnName("tenant_id").HasMaxLength(128).IsRequired();
+            e.Property(x => x.IdempotencyKey).HasColumnName("idempotency_key").HasMaxLength(256);
+            e.Property(x => x.Status).HasColumnName("status").HasConversion<string>().HasMaxLength(24);
+            e.Property(x => x.Attempt).HasColumnName("attempt");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.Property(x => x.AvailableAt).HasColumnName("available_at");
+            e.Property(x => x.LockedAt).HasColumnName("locked_at");
+            e.Property(x => x.LockedBy).HasColumnName("locked_by");
+            e.Property(x => x.Error).HasColumnName("error");
+            e.Property(x => x.ProcessedAt).HasColumnName("processed_at");
             e.HasIndex(x => new { x.TenantId, x.IdempotencyKey }).IsUnique();
             e.HasIndex(x => new { x.Status, x.AvailableAt });
         });
@@ -47,9 +57,12 @@ public sealed class IngestionDbContext : DbContext
         {
             e.ToTable("raw_events");
             e.HasKey(x => x.Id);
-            e.Property(x => x.Type).HasMaxLength(128).IsRequired();
-            e.Property(x => x.TenantId).HasMaxLength(128).IsRequired();
-            e.Property(x => x.PayloadJson).IsRequired();
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.JobId).HasColumnName("job_id");
+            e.Property(x => x.TenantId).HasColumnName("tenant_id").HasMaxLength(128).IsRequired();
+            e.Property(x => x.Type).HasColumnName("type").HasMaxLength(128).IsRequired();
+            e.Property(x => x.Timestamp).HasColumnName("timestamp");
+            e.Property(x => x.PayloadJson).HasColumnName("payload_json").IsRequired();
             e.HasIndex(x => x.JobId);
             e.HasOne(x => x.Job).WithMany(x => x.RawEvents).HasForeignKey(x => x.JobId);
         });
@@ -58,7 +71,10 @@ public sealed class IngestionDbContext : DbContext
         {
             e.ToTable("ingestion_results");
             e.HasKey(x => x.Id);
-            e.Property(x => x.EventType).HasMaxLength(128).IsRequired();
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.JobId).HasColumnName("job_id");
+            e.Property(x => x.EventType).HasColumnName("event_type").HasMaxLength(128).IsRequired();
+            e.Property(x => x.Count).HasColumnName("count");
             e.HasIndex(x => x.JobId);
             e.HasOne(x => x.Job).WithMany(x => x.Results).HasForeignKey(x => x.JobId);
         });
