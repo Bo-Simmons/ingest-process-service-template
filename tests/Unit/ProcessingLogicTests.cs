@@ -1,6 +1,7 @@
 using Application;
 using Domain;
 using FluentAssertions;
+using Xunit;
 
 namespace Unit;
 
