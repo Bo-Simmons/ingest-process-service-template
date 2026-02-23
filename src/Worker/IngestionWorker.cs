@@ -2,6 +2,7 @@ using Application;
 using Domain;
 using Infrastructure;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
 /// <summary>
@@ -9,7 +10,7 @@ using Microsoft.Extensions.Options;
 /// stores aggregated results, and handles retry/failure behavior.
 /// </summary>
 public sealed class IngestionWorker(
-    IDbContextFactory<IngestionDbContext> dbContextFactory,
+    IServiceScopeFactory scopeFactory,
     IOptions<WorkerOptions> options,
     ILogger<IngestionWorker> logger) : BackgroundService
 {
@@ -47,7 +48,8 @@ public sealed class IngestionWorker(
         {
             try
             {
-                await using var db = await dbContextFactory.CreateDbContextAsync(ct);
+                using var scope = scopeFactory.CreateScope();
+                var db = scope.ServiceProvider.GetRequiredService<IngestionDbContext>();
 
                 var claimed = await TryClaimJob(db, ct);
                 if (claimed is null)
