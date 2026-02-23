@@ -11,6 +11,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using System.Net;
 using Xunit;
 
 namespace Integration;
@@ -50,17 +51,24 @@ public sealed class IngestionFlowTests : IClassFixture<TestApiFactory>
         };
 
         var post = await client.PostAsJsonAsync("/v1/ingestions", payload);
-        post.StatusCode.Should().Be(System.Net.HttpStatusCode.Accepted);
+        var postRawBody = await post.Content.ReadAsStringAsync();
+        post.StatusCode.Should().Be(HttpStatusCode.Accepted, "body: {0}", postRawBody);
         var postBody = await post.Content.ReadFromJsonAsync<JobCreateResponse>();
         postBody.Should().NotBeNull();
 
         await SimulateWorker(postBody!.JobId);
 
-        var status = await client.GetFromJsonAsync<JobStatusResponse>($"/v1/ingestions/{postBody.JobId}");
+        var statusResponse = await client.GetAsync($"/v1/ingestions/{postBody.JobId}");
+        var statusRawBody = await statusResponse.Content.ReadAsStringAsync();
+        statusResponse.StatusCode.Should().Be(HttpStatusCode.OK, "body: {0}", statusRawBody);
+        var status = await statusResponse.Content.ReadFromJsonAsync<JobStatusResponse>();
         status.Should().NotBeNull();
         status!.Status.Should().Be(nameof(IngestionJobStatus.Succeeded));
 
-        var results = await client.GetFromJsonAsync<JobResultsResponse>($"/v1/results/{postBody.JobId}");
+        var resultsResponse = await client.GetAsync($"/v1/results/{postBody.JobId}");
+        var resultsRawBody = await resultsResponse.Content.ReadAsStringAsync();
+        resultsResponse.StatusCode.Should().Be(HttpStatusCode.OK, "body: {0}", resultsRawBody);
+        var results = await resultsResponse.Content.ReadFromJsonAsync<JobResultsResponse>();
         results.Should().NotBeNull();
         results!.Results.Should().ContainEquivalentOf(new Api.Contracts.ResultItem("clicked", 2));
         results.Results.Should().ContainEquivalentOf(new Api.Contracts.ResultItem("viewed", 1));
@@ -132,8 +140,7 @@ public sealed class TestApiFactory : WebApplicationFactory<Program>, IDisposable
 
             using var scope = services.BuildServiceProvider().CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<IngestionDbContext>();
-            db.Database.EnsureDeleted();
-            db.Database.Migrate();
+            db.Database.EnsureCreated();
         });
     }
 
