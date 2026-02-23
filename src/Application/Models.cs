@@ -59,6 +59,21 @@ public sealed class WorkerOptions
     /// Base delay (in seconds) used by exponential backoff between retries.
     /// </summary>
     public int BaseBackoffSeconds { get; set; } = 2;
+
+    /// <summary>
+    /// Base poll interval (in seconds) used by worker loops when checking for available jobs.
+    /// </summary>
+    public int WorkerPollSeconds { get; set; } = 1;
+
+    /// <summary>
+    /// Maximum idle poll backoff (in seconds) used when loops repeatedly find no jobs.
+    /// </summary>
+    public int WorkerIdleBackoffMaxSeconds { get; set; } = 10;
+
+    /// <summary>
+    /// Enables debug-level "no jobs available" loop logging when true.
+    /// </summary>
+    public bool WorkerLogNoJobs { get; set; }
 }
 
 /// <summary>
