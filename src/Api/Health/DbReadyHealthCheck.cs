@@ -12,7 +12,8 @@ public sealed class DbReadyHealthCheck(IConfiguration configuration) : IHealthCh
         try
         {
             var connectionString = DbConnectionFactory.ResolveConnectionString(configuration);
-            await using var connection = new NpgsqlConnection(connectionString);
+            var normalizedConnectionString = DbConnectionFactory.NormalizePostgresConnectionString(connectionString);
+            await using var connection = new NpgsqlConnection(normalizedConnectionString);
             await connection.OpenAsync(cancellationToken);
 
             await using var command = new NpgsqlCommand("SELECT 1", connection);
