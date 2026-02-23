@@ -17,6 +17,10 @@ public sealed class ResultsController(IIngestionService ingestionService) : Cont
             return NotFound(new ProblemDetails { Title = "Job not found", Status = 404 });
         }
 
-        return Ok(new JobResultsResponse(results.JobId, results.Results.Select(x => new ResultItem(x.EventType, x.Count)).ToList()));
+        var responseItems = results.Results
+            .Select(static x => new Api.Contracts.ResultItem(x.EventType, x.Count))
+            .ToList();
+
+        return Ok(new JobResultsResponse(results.JobId, responseItems));
     }
 }

@@ -27,8 +27,8 @@ public sealed class ProcessingLogicTests
 
         results.Should().BeEquivalentTo(new[]
         {
-            new ResultItem("clicked", 2),
-            new ResultItem("viewed", 1)
+            new ProcessingResultItem("clicked", 2),
+            new ProcessingResultItem("viewed", 1)
         });
     }
 
