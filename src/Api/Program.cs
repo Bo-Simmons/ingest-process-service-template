@@ -9,6 +9,9 @@ using Serilog.Formatting.Compact;
 
 var builder = WebApplication.CreateBuilder(args);
 
+const string LiveHealthCheckName = "live";
+const string ReadyHealthCheckName = "ready";
+
 // Configuration + logging
 builder.Services.Configure<WorkerOptions>(builder.Configuration);
 
@@ -27,8 +30,8 @@ builder.Services.AddControllers();
 builder.Services.AddInfrastructure(builder.Configuration);
 
 builder.Services.AddHealthChecks()
-    .AddCheck("live", () => HealthCheckResult.Healthy())
-    .AddCheck<DbReadyHealthCheck>("ready");
+    .AddCheck(LiveHealthCheckName, () => HealthCheckResult.Healthy())
+    .AddCheck<DbReadyHealthCheck>(ReadyHealthCheckName);
 
 // App pipeline
 var app = builder.Build();
@@ -64,12 +67,12 @@ using (var scope = app.Services.CreateScope())
 // Endpoints
 app.MapHealthChecks("/health/live", new HealthCheckOptions
 {
-    Predicate = r => r.Name == "live"
+    Predicate = r => r.Name == LiveHealthCheckName
 });
 
 app.MapHealthChecks("/health/ready", new HealthCheckOptions
 {
-    Predicate = r => r.Name == "ready"
+    Predicate = r => r.Name == ReadyHealthCheckName
 });
 
 app.MapControllers();
