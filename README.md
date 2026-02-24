@@ -38,25 +38,37 @@ Environment variables:
 - `RUN_MIGRATIONS_ON_STARTUP`
 - `ASPNETCORE_URLS` / `PORT` (port binding notes below)
 
-## Run locally without Docker (`dotnet run`)
+## Local Development (no Docker)
 
-By default, the API listens on `http://localhost:5000` when running locally unless you override URLs.
+Prerequisites:
+- .NET 8 SDK
+- PostgreSQL
+
+Set your database connection string:
+
+```bash
+ConnectionStrings__Db="Host=localhost;Port=5432;Database=ingest_process;Username=postgres;Password=postgres"
+```
+
+Apply migrations once:
+
+```bash
+dotnet ef database update --project src/Infrastructure/Infrastructure.csproj --startup-project src/Api/Api.csproj
+```
+
+Run API and Worker in two terminals:
 
 ```bash
 dotnet run --project src/Api/Api.csproj
 ```
 
-Optional explicit override (local):
-
-```bash
-ASPNETCORE_URLS=http://localhost:5000 dotnet run --project src/Api/Api.csproj
-```
-
-Run the worker in a second terminal:
-
 ```bash
 dotnet run --project src/Worker/Worker.csproj
 ```
+
+Local health endpoints:
+- `http://localhost:5000/health/live`
+- `http://localhost:5000/health/ready`
 
 ## Run with Docker Compose
 
@@ -78,6 +90,30 @@ Run smoke test:
 - `Dockerfile.api` exposes port `8080`.
 - `app.yaml` sets `http_port: 8080`, which matches DigitalOcean App Platform's default expectation for HTTP services.
 - If your platform injects `PORT`, ensure your runtime binding resolves to `0.0.0.0:8080` (or keep `ASPNETCORE_URLS=http://+:8080`).
+
+## DigitalOcean App Platform Deployment (Buildpack)
+
+1. Create a new app from this GitHub repository in App Platform.
+2. Add a PostgreSQL database component (DigitalOcean Managed PostgreSQL is recommended).
+3. App Platform provides `DATABASE_URL` automatically when the DB is attached.
+4. Set environment variables for the API service:
+   - `ConnectionStrings__Db=${DATABASE_URL}`
+   - `RUN_MIGRATIONS_ON_STARTUP=true` (first deploy only)
+5. Deploy once, verify the app starts, then set `RUN_MIGRATIONS_ON_STARTUP=false` for normal operation.
+6. Ensure the web service binds to `0.0.0.0:8080` (App Platform HTTP default).
+
+If the UI does not let you add a Worker during initial setup, add one after app creation:
+- Create a Worker component from the same repo.
+- Set a run command that starts the worker process (for example: `dotnet run --project src/Worker/Worker.csproj`).
+- Ensure the Worker also has `ConnectionStrings__Db=${DATABASE_URL}`.
+
+## Smoke Test (Windows)
+
+After deploy, run:
+
+```powershell
+.\scripts\smoke.ps1 -BaseUrl "https://<app>.ondigitalocean.app"
+```
 
 ## Tests
 
